@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Último Precio de Opciones</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        #contenedor-principal {
+            display: flex;
+        }
+        #tabla-container {
+            flex: 1;
+        }
+        #detalle-cotizacion {
+            flex: 1;
+            margin-left: 20px;
+        }
+        #detalle-cotizacion h2 {
+            margin-top: 0;
+        }
+        .info-box {
+            border: 1px solid #ccc;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .resultado {
+            margin-top: 10px;
+        }
+        .saldo {
+            font-weight: bold;
+            color: green; /* Color para saldo positivo */
+        }
+        .saldo.negativo {
+            color: red; /* Color para saldo negativo */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Último Precio de Opciones</h1>
+    
+    <!-- Selector para elegir entre Call y Put -->
+    <label for="tipoOpcion">Selecciona el tipo de opción:</label>
+    <select id="tipoOpcion">
+        <option value="Call">Call</option>
+        <option value="Put">Put</option>
+    </select>
+    
+    <button onclick="cargarPrecios()">Cargar Precios</button>
+
+    <div id="contenedor-principal">
+        <!-- Contenedor de la tabla -->
+        <div id="tabla-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Símbolo</th>
+                        <th>Último Precio</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-precios">
+                    <tr>
+                        <td colspan="4">Cargando datos...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Contenedor para mostrar el último precio del segundo endpoint -->
+        <div id="detalle-cotizacion">
+            <h2>Cotización</h2>
+            <div class="info-box" id="info-precio">
+                Último precio: <span id="ultimo-precio">Cargando...</span>
+            </div>
+            <div class="resultado" id="resultado"></div>
+            <div class="saldo" id="saldo">Saldo: <span id="saldo-valor"></span></div>
+        </div>
+    </div>
+
+    <script>
+        let opciones = []; // Array para almacenar las opciones
+        let saldo = 0; // Saldo inicial
+        let resultadoAccion = ''; // Variable para mostrar el resultado de la acción
+
+        // Función para cargar precios según el tipo de opción seleccionado
+        function cargarPrecios() {
+            const tipoOpcion = document.getElementById('tipoOpcion').value;
+
+            // Llamada al primer endpoint para cargar las opciones (Call o Put)
+            fetch(`http://localhost:3000/api/opciones/bcba/ggal/${tipoOpcion}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Acceder al cuerpo de la tabla
+                    const tablaPrecios = document.getElementById('tabla-precios');
+
+                    // Limpiar contenido inicial
+                    tablaPrecios.innerHTML = '';
+
+                    // Almacenar las opciones
+                    opciones = data;
+
+                    // Recorrer los datos recibidos y generar filas de tabla
+                    data.forEach((opcion, index) => {
+                        const fila = document.createElement('tr');
+
+                        // Crear celdas con los datos de cada opción
+                        fila.innerHTML = `
+                            <td>${index + 1}</td>
+                            <td>${opcion.simbolo}</td>
+                            <td>${opcion.cotizacion.ultimoPrecio}</td>
+                            <td>
+                                <button onclick="comprar('${opcion.simbolo}', ${opcion.cotizacion.ultimoPrecio})">Comprar</button>
+                                <button onclick="vender('${opcion.simbolo}', ${opcion.cotizacion.ultimoPrecio})">Vender</button>
+                            </td>
+                        `;
+
+                        // Añadir la fila a la tabla
+                        tablaPrecios.appendChild(fila);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error al obtener los datos:', error);
+                    document.getElementById('tabla-precios').innerHTML = `
+                        <tr><td colspan="4">Error al cargar los datos.</td></tr>
+                    `;
+                });
+
+            // Llamada al segundo endpoint para obtener el último precio
+            fetch(`http://localhost:3000/api/cotizacion/bcba/ggal?modelMercado=bcba&modelSimbolo=ggal&modelPlazo=T0`)
+                .then(response => response.json())
+                .then(data => {
+                    // Mostrar el último precio en el contenedor
+                    document.getElementById('ultimo-precio').textContent = data.ultimoPrecio;
+                })
+                .catch(error => {
+                    console.error('Error al obtener los datos de cotización:', error);
+                    document.getElementById('ultimo-precio').textContent = 'Error al cargar el precio';
+                });
+        }
+
+        // Función para comprar
+        function comprar(simbolo, precio) {
+            saldo -= precio; // Debitar el precio del saldo
+            resultadoAccion = `Compraste ${simbolo} por ${precio}. Saldo actual: ${saldo}`;
+            mostrarResultado();
+            actualizarSaldo();
+        }
+
+        // Función para vender
+        function vender(simbolo, precio) {
+            saldo += precio; // Acreditar el precio al saldo
+            resultadoAccion = `Vendiste ${simbolo} por ${precio}. Saldo actual: ${saldo}`;
+            mostrarResultado();
+            actualizarSaldo();
+        }
+
+        // Función para mostrar el resultado de la acción
+        function mostrarResultado() {
+            document.getElementById('resultado').textContent = resultadoAccion;
+        }
+
+        // Función para actualizar el saldo visualmente
+        function actualizarSaldo() {
+            const saldoValor = document.getElementById('saldo-valor');
+            saldoValor.textContent = saldo;
+            saldoValor.className = saldo < 0 ? 'saldo negativo' : ''; // Cambiar clase si el saldo es negativo
+        }
+    </script>
+
+</body>
+</html>
